@@ -674,7 +674,7 @@ function renderSpecial(){
 }
 
 function renderFromCompMediaMp4(compMedia){
-  genericRender(compMedia.renderMp4, mySettings.renderFolderMp4, theData.specials[compMedia.name].aeMp4Filename, mySettings.renderTemplateMp4)
+  genericRender(compMedia.renderMp4, theData.specials[compMedia.name].aePackageFolder, theData.specials[compMedia.name].aeMp4Filename, mySettings.renderTemplateMp4)
 }
 
 function renderFromCompMediaWebApp(compMedia){
