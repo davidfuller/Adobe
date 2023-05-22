@@ -1,3 +1,5 @@
+//@include "File_Stuff.jsx"
+
 /**
  * @param {string} [folderName]
  * @returns {Array<CompItem>}
@@ -23,14 +25,18 @@ function compItems(folderName){
 /**
  * 
  * @param {CompItem} comp 
+ * @returns {Array<Layer>}
  */
 function textLayers(comp){
+  /**
+   * @type {Array<Layer>}
+   */
   var text = []
   if (comp instanceof CompItem){
     var myLayers = comp.layers
     for (var i = 1; i <= myLayers.length; i++){
       if (myLayers[i] instanceof TextLayer){
-        text.push(myLayers[i])
+        text.push(myLayers[i]);
       }
     }
   }
@@ -47,7 +53,7 @@ function textLayers(comp){
  * @param {CompItem} comp 
  * @returns {Array<FootageObject>}
  */
-function footageLayers(comp){
+function footageAndCompLayers(comp){
   var footage = []
   if (comp instanceof CompItem){
     var myLayers = comp.layers
@@ -63,6 +69,28 @@ function footageLayers(comp){
           if (testLayer.source instanceof CompItem){
             var temp = {layer: testLayer, type: "COMP"}
             footage.push(temp)
+          }
+        }
+      }
+    }
+  }
+  return footage
+}
+/**
+ * 
+ * @param {CompItem} comp 
+ * @returns {Array<AVLayer>}
+ */
+function footageLayers(comp){
+  var footage = []
+  if (comp instanceof CompItem){
+    var myLayers = comp.layers
+    for (var i = 1; i <= myLayers.length; i++){
+      var testLayer = myLayers[i]
+      if (testLayer instanceof AVLayer){
+        if (testLayer.source instanceof FootageItem){
+          if (testLayer.source.mainSource instanceof FileSource){
+            footage.push(testLayer)
           }
         }
       }
@@ -104,7 +132,7 @@ function footageFile(myFootage){
   if (myFootage.type == "FOOT"){
     return myFootage.layer.source.mainSource.file;
   } else {
-    var theLayers = footageLayers(myFootage.layer.source);
+    var theLayers = footageAndCompLayers(myFootage.layer.source);
     if (theLayers.length > 0){
       var found = false;
       for (var i = 0; i < theLayers.length; i++){
@@ -133,7 +161,11 @@ function footageDisplay(footageObj){
   }
 }
 
-
+/**
+ * 
+ * @param {CompItem} comp
+ * @returns {Array<string>} 
+ */
 function availableRenderTemplates(comp){
   var templates = [];
   if (comp instanceof CompItem){
@@ -141,6 +173,7 @@ function availableRenderTemplates(comp){
     var outputModule = renderItem.outputModule(1);
     templates = outputModule.templates
     renderItem.remove();
+    comp.openInViewer();
   }
   return templates
 }
@@ -168,15 +201,23 @@ function findOrCreateFolder(folderName){
 }
 /**
  * 
- * @param {*} compWindow 
- * @param {*} projectItems 
+ * @param {string} folderName 
+ * @returns {FolderItem}
  */
-
-function compFromDropDown(compWindow, projectItems){
-  var mySelection = compWindow.compDropdown.selection.index
-  
-  return projectItems[mySelection]
+function createFolderDeletePrevious(folderName){
+  for (var i = 1; i <= app.project.numItems; i++){
+    var temp = app.project.item(i)
+    if (temp.name == folderName){
+      if (temp instanceof FolderItem){ 
+        temp.remove();
+        break;
+      }
+    }
+  }
+  var myFolder = app.project.items.addFolder(folderName)
+  return myFolder;
 }
+
 function hexToRGBArray(hex){
   var rgb = parseInt(hex, 16); 
   var red;
@@ -233,41 +274,70 @@ function compFromName(compName){
   }
   return null;
 }
+/**
+ * 
+ * @param {DropDownList} drop 
+ * @returns {CompItem}
+ */
+function compFromDropDown(drop){
+  if (drop.selection != null){
+    return compFromName(drop.selection.toString())
+  } else {
+    return null
+  }
+}
 
 function processData(){
-  
-  var myFolder = findOrCreateFolder("MuVi2 Temp");
-  var myTempFootageFolder = findOrCreateFolder("Temp Footage");
-  myTempFootageFolder.parentFolder = myFolder
+  var myFolder =  createFolderDeletePrevious("MuVi2 Temp"); ///findOrCreateFolder("MuVi2 Temp");
+  var myTempFootageFolder = findOrCreateFolder("MuVi2 Temp Footage");
+  myTempFootageFolder.parentFolder = myFolder;
+  var mySubCompsFolder = findOrCreateFolder("MuVi2 Sub Comps");
+  mySubCompsFolder.parentFolder = myFolder;
+
   for (var i= 0; i < promoCount(myXML); i++){
     if (selectedPromos[i]){
       var promo = promoData(myXML,i);
       var profile = loadProfileFromPromoData(promo);
       var myComp = compFromName(profile.composition);
-      var baseName = myComp.name
       var newComp = myComp.duplicate();
       newComp.parentFolder = myFolder;  
-      newComp.name = replacesSpacesWithUnderscores(baseName + "_" + promoCompName(promoData(myXML,i)));
-      var newTextLayers = textLayers(newComp)
-      for (var textLayer = 0; textLayer < textLayerNames.length; textLayer++){
-        var thisTextLayer = getTextLayer(textLayerNames[textLayer],profile)
+      newComp.name = replacesSpacesWithUnderscores(promoCompName(promoData(myXML,i), true));
+      
+      var myEndBoardComp = compFromName(profile.endBoardComp);
+      var newEndBoardComp = myEndBoardComp.duplicate();
+      newEndBoardComp.parentFolder = myFolder
+      newEndBoardComp.name = newComp.name + "_END_BOARD"
+
+      var endBoardLayer = doTheEndBoard(newComp, myEndBoardComp, newEndBoardComp);
+      var tcOffset = timecodeToSeconds(pData.endBoardTimecode, newComp.frameRate);
+      endBoardLayer.startTime = tcOffset;
+
+      var newTextLayers = textLayers(newEndBoardComp)
+      //hide the text layers
+      for (var layer =0; layer < newTextLayers.length; layer++){
+        newTextLayers[layer].enabled =false;
+      }
+
+      for (var textLayer = 0; textLayer < textMapping.length; textLayer++){
+        var thisTextLayer = getTextLayer(textMapping[textLayer].profileField, profile);
         for (var layer = 0; layer < newTextLayers.length; layer++){
           if (newTextLayers[layer].name == thisTextLayer){
-            setTextValue(newTextLayers[layer],promoData(myXML,i)[textLayerNames[textLayer].toLowerCase()], getHexColour(textLayerNames[textLayer], profile))
+            newTextLayers[layer].enabled = true;
+            setTextValue(newTextLayers[layer], promoData(myXML,i)[textMapping[textLayer].dataField], getHexColour(textMapping[textLayer].profileField, profile))
           }
         }
       }
-      doThePromoClip(i, myTempFootageFolder, myComp, newComp, profile);
+      doThePromoClip(i, myTempFootageFolder, myComp, newComp, myEndBoardComp, newEndBoardComp, profile, tcOffset);
       var bgCompName = promoData(myXML, i).backgroundName;
       var logoCompName = promoData(myXML, i).logoName;
-      doBackgroundAndLogo(myComp, newComp, profile, bgCompName, logoCompName);
+      doBackgroundAndLogo(myEndBoardComp, newEndBoardComp, profile, bgCompName, logoCompName);
+      doTheAudioClip(i, myTempFootageFolder, myComp, newComp, profile);
       newComp.openInViewer()
-      newComp.time = 5;
+      newComp.time = Number(profile.posterFrame);
 
       var renderProfile = getRenderProfile(profile)
-      saveFrame(newComp, 125, renderProfile.still);
-      renderMovie(newComp, renderProfile.clip);
-
+      saveFrame(newComp, Number(profile.posterFrame) * newComp.frameRate, renderProfile.still);
+      renderMovie(newComp, renderProfile.clip); 
     }
   }
 }
@@ -277,35 +347,65 @@ function processData(){
  * @param {FolderItem} tempFolder 
  * @param {CompItem} originalComp
  * @param {CompItem} newComp
+ * @param {CompItem} originalEndBoardComp
+ * @param {CompItem} newEndBoardComp
+ * @param {number} endBoardTime
  * @param {profile} profile
  */
-function doThePromoClip(promoNum, tempFolder, originalComp, newComp, profile){
-  var impOpts = new ImportOptions(promoData(myXML, promoNum).fullFile);
+function doThePromoClip(promoNum, tempFolder, originalComp, newComp, originalEndBoardComp, newEndBoardComp,  profile, endBoardTime){
+  var myFile = new File(promoData(myXML, promoNum).fullFile)
+  var impOpts = new ImportOptions(myFile);
   if (impOpts.canImportAs(ImportAsType.FOOTAGE)){
     impOpts.importAs = ImportAsType.FOOTAGE;
     var newFootage = app.project.importFile(impOpts);
     newFootage.parentFolder = tempFolder;
   }
-  var footageObj = getFootageLayer(originalComp, profile);
+  var footageObj = getFootageAndCompLayer(originalComp, profile);
   if (footageObj.type == "COMP"){
     var footageComp = footageObj.layer.source;
     var newFootageComp =footageComp.duplicate();
     newFootageComp.parentFolder = tempFolder;
     newFootageComp.name = fileNameWithoutExtension(impOpts.file)
 
-    var newCompFootageLayers = footageLayers(newComp)
+    var newCompFootageLayers = footageAndCompLayers(newComp)
     for (var j = 0; j < newCompFootageLayers.length; j++){
       if (newCompFootageLayers[j].type == "COMP"){
         if (newCompFootageLayers[j].layer.source.name == footageObj.layer.source.name){
           newCompFootageLayers[j].layer.replaceSource(newFootageComp, false)
+          newCompFootageLayers[j].layer.outPoint = endBoardTime
         }
       }
     }
-    var newFootageLayers = footageLayers(newFootageComp)
+    var newFootageLayers = footageAndCompLayers(newFootageComp)
     for (var j = 0; j < newFootageLayers.length; j++){
       if (newFootageLayers[j].type == "FOOT"){
         if (newFootage instanceof FootageItem){
           newFootageLayers[j].layer.replaceSource(newFootage, false)
+        }
+      }
+    }
+  }
+  var endBoardFootageObj = getFootageAndCompLayer(originalEndBoardComp, profile);
+  if (endBoardFootageObj.type == "COMP"){
+    var endBoardFootageComp = endBoardFootageObj.layer.source;
+    var newEndBoardFootageComp =endBoardFootageComp.duplicate();
+    newEndBoardFootageComp.parentFolder = tempFolder;
+    newEndBoardFootageComp.name = fileNameWithoutExtension(impOpts.file) + "_END_BOARD"
+
+    var newEndBoardCompFootageLayers = footageAndCompLayers(newEndBoardComp)
+    for (var j = 0; j < newEndBoardCompFootageLayers.length; j++){
+      if (newEndBoardCompFootageLayers[j].type == "COMP"){
+        if (newEndBoardCompFootageLayers[j].layer.source.name == endBoardFootageObj.layer.source.name){
+          newEndBoardCompFootageLayers[j].layer.replaceSource(newEndBoardFootageComp, false)
+          newEndBoardCompFootageLayers[j].layer.startTime = -endBoardTime;
+        }
+      }
+    }
+    var newEndBoardFootageLayers = footageAndCompLayers(newEndBoardFootageComp)
+    for (var j = 0; j < newEndBoardFootageLayers.length; j++){
+      if (newEndBoardFootageLayers[j].type == "FOOT"){
+        if (newFootage instanceof FootageItem){
+          newEndBoardFootageLayers[j].layer.replaceSource(newFootage, false)
         }
       }
     }
@@ -346,4 +446,44 @@ function doBackgroundAndLogo(originalComp, newComp, profile, backgroundName, log
       newLayers[j].replaceSource(newLogoComp, false)
     }
   }
+}
+/**
+ * 
+ * @param {number} promoNum 
+ * @param {FolderItem} tempFolder 
+ * @param {CompItem} originalComp
+ * @param {CompItem} newComp
+ * @param {profile} profile
+ */
+function doTheAudioClip(promoNum, tempFolder, originalComp, newComp, profile){
+  var myFile = new File(promoData(myXML, promoNum).audioFile);
+  var impOpts = new ImportOptions(myFile);
+  if (impOpts.canImportAs(ImportAsType.FOOTAGE)){
+    impOpts.importAs = ImportAsType.FOOTAGE;
+    var newFootage = app.project.importFile(impOpts);
+    newFootage.parentFolder = tempFolder;
+
+    var footageLayer = getFootageLayer(newComp, profile);
+    if (newFootage instanceof FootageItem){
+      footageLayer.replaceSource(newFootage, false);
+    }
+  }
+}
+/**
+ * 
+ * @param {CompItem} newComp 
+ * @param {CompItem} originalEndBoardComp 
+ * @param {CompItem} newEndBoardComp 
+ * @returns {AVLayer}
+ */
+function doTheEndBoard(newComp, originalEndBoardComp, newEndBoardComp){
+  var compLayer = getCompLayer(newComp,originalEndBoardComp.name);
+  compLayer.replaceSource(newEndBoardComp,false);
+  return compLayer
+}
+
+function showCompWindow(){
+  var projectItems = compItems();
+  var compWindow = createCompSettingsWindow(projectItems);
+  compWindow.window.show() 
 }
