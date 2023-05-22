@@ -22,22 +22,40 @@ function saveFrame(theComp, frameNumber, renderTemplate){
           renamedFile.remove()
         }
       }
-      $.writeln(renderedFile.rename(theComp.name + ext))
+      renderedFile.rename(theComp.name + ext)
     }
   }
 }
+/**
+ * 
+ * @param {CompItem} theComp 
+ * @param {string} renderTemplate 
+ */
 function renderMovie(theComp, renderTemplate){
   if (theComp instanceof CompItem){
     var renderItem = app.project.renderQueue.items.add(theComp);
     var outputModule = renderItem.outputModule(1);
-    var outputFolder = "/Users/David/Dropbox/Development/Adobe/Movies/";
-
+    var outputFolder = getOutputFolderName()
+    
     outputModule.applyTemplate(renderTemplate);
+    var omSettings = outputModule.getSettings(GetSettingsFormat.STRING)
+    var omFileInfo = omSettings["Output File Info"]
+    var ext = getExtension(omFileInfo["Full Flat Path"]);
+
+    var fileName = theComp.name
+    if (ext != null){
+      fileName = fileName + ext
+    }
+    archiveFile(outputFolder, archiveSubFolder, fileName)
     outputModule.file = File(outputFolder + theComp.name);
     app.project.renderQueue.render();
   } 
 }
-
+/**
+ * 
+ * @param {string} filename 
+ * @returns {string}
+ */
 function getExtension(filename){
 
   var finalDotPosition = filename.lastIndexOf(".");
