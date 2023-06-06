@@ -1,0 +1,1 @@
+"C:\Program Files\Adobe\Adobe After Effects 2023\Support Files\AfterFX" -r "\\alpaca\dropbox\Development\Adobe\ads.jsx"
