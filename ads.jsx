@@ -2,6 +2,8 @@
 //@include "json2.jsx"
 //@include "watchfolder.jsx"
 //@include "json_Stuff.jsx"
+app.exitAfterLaunchAndEval = true;
+app.beginSuppressDialogs();
 
 var mySettings = {
   watchFolder: "\\\\alpaca\\dropbox\\NEG\\ADS_PREVIEW_AE\\watchfolder\\",
@@ -252,6 +254,23 @@ var compMedia = [
 $.writeln ("Hello");
 var toProcess;
 
+var myProjectFilename = "C:\\AE Projects\\VIAPLAY_ADS\\VIAPLAY_ADS.aep"
+
+var myProject = app.project
+if (myProject.file == null){
+  writeLog("No project open. Opening: " + myProjectFilename);
+  app.open(File(myProjectFilename));
+} else {
+  if(myProject.file.fsName == myProjectFilename){
+    writeLog("Correct project is open");
+  } else {
+    writeLog("Incorrect project is open. Closing: " + myProject.file.name + " and opening: " + myProjectFilename);
+    myProject.close(CloseOptions.PROMPT_TO_SAVE_CHANGES);
+    app.open(File(myProjectFilename));
+  } 
+}
+
+
 var myWindow = new Window("palette","Automated Dynamic Specials")
 myWindow.orientation = "column";
 
@@ -313,18 +332,12 @@ readTheData();
 var autoRender = true;
 if (isMediaGood && autoRender){
   if (!sportsIPP){
-    theLog = []
-    theLog.push({time: new Date, message: "About to render special preview"})
-    writeJsonLog(theLog);
+    writeLog("About to render special preview");
     renderForWebApp();
   } else {
-    theLog = []
-    theLog.push({time: new Date, message: "About to render Sports IPP. Web App mov"})
-    writeJsonLog(theLog);
+    writeLog("About to render Sports IPP. Web App mov");
     renderForWebApp();
-    theLog = []
-    theLog.push({time: new Date, message: "About to render Sports IPP. Mp4"})
-    writeJsonLog(theLog);
+    writeLog("About to render Sports IPP. Mp4");
     renderForMp4();
     theLog = []
     theLog.push({time: new Date, message: "About to render Sports IPP. ProRes"})
@@ -339,6 +352,7 @@ if (isMediaGood && autoRender){
     writeJsonLog(theLog);
   }
 }
+app.endSuppressDialogs(false);
 myWindow.show();
 
 function findDataFileAsFootageItem(dataFileName){
@@ -682,7 +696,7 @@ function renderFromCompMediaWebApp(compMedia){
 }
 
 function renderFromCompMediaProRes(compMedia){
-  genericRender(compMedia.renderProRes, mySettings.renderFolderProRes, theData.specials[compMedia.name].aeProResFilename, mySettings.renderTemplateProRes)
+  genericRender(compMedia.renderProRes, theData.specials[compMedia.name].aeProResFolder, theData.specials[compMedia.name].aeProResFilename, mySettings.renderTemplateProRes)
 }
 
 
@@ -719,7 +733,7 @@ function genericRender(renderCompName, renderFolder, renderFilename, renderTempl
 }
 
 function writeTextFile(compMedia){
-  var textFile = File(mySettings.textFolder + theData.specials[compMedia.name].textFilename);
+  var textFile = File(theData.specials[compMedia.name].aePackageFolder + theData.specials[compMedia.name].textFilename);
   var myData = theData.specials[compMedia.name]
   textFile.open('w');
   writeUnderline(textFile, myData.name,"=");
