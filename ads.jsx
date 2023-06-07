@@ -4,6 +4,7 @@
 //@include "json_Stuff.jsx"
 app.exitAfterLaunchAndEval = true;
 app.beginSuppressDialogs();
+app.purge(PurgeTarget.ALL_CACHES);
 
 var mySettings = {
   watchFolder: "\\\\alpaca\\dropbox\\NEG\\ADS_PREVIEW_AE\\watchfolder\\",
@@ -259,14 +260,14 @@ var myProjectFilename = "C:\\AE Projects\\VIAPLAY_ADS\\VIAPLAY_ADS.aep"
 var myProject = app.project
 if (myProject.file == null){
   writeLog("No project open. Opening: " + myProjectFilename);
-  app.open(File(myProjectFilename));
+  myProject = app.open(File(myProjectFilename));
 } else {
   if(myProject.file.fsName == myProjectFilename){
     writeLog("Correct project is open");
   } else {
     writeLog("Incorrect project is open. Closing: " + myProject.file.name + " and opening: " + myProjectFilename);
     myProject.close(CloseOptions.PROMPT_TO_SAVE_CHANGES);
-    app.open(File(myProjectFilename));
+    myProject = app.open(File(myProjectFilename));
   } 
 }
 
@@ -352,8 +353,9 @@ if (isMediaGood && autoRender){
     writeJsonLog(theLog);
   }
 }
-app.endSuppressDialogs(false);
-myWindow.show();
+//app.endSuppressDialogs(false);
+//myWindow.show();
+myProject.close(CloseOptions.DO_NOT_SAVE_CHANGES);
 
 function findDataFileAsFootageItem(dataFileName){
   return findFootageItem(dataFileName);
